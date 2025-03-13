@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣景點推薦系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        .card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background-color: #0d6efd;
+            color: white;
+            font-weight: bold;
+        }
+
+        .recommendation-item {
+            border-left: 4px solid #0d6efd;
+            padding-left: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .recommendation-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        .badge-score {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            margin-right: 10px;
+        }
+
+        .keyword-badge {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        .route-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+
+        .route-number {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .route-arrow {
+            font-size: 20px;
+            margin: 0 10px;
+            color: #6c757d;
+        }
+
+        .timeline {
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .timeline::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            background-color: #0d6efd;
+            top: 0;
+            bottom: 0;
+            left: 20px;
+            margin-left: -3px;
+        }
+
+        .timeline-item {
+            padding: 10px 40px;
+            position: relative;
+            background-color: inherit;
+            width: 100%;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            left: 10px;
+            background-color: white;
+            border: 4px solid #0d6efd;
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .timeline-content {
+            padding: 15px;
+            background-color: white;
+            position: relative;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header text-center py-3">
+                        <h2>台灣景點智能推薦系統</h2>
+                        <p class="mb-0">基於圖神經網路的個性化景點推薦與路線規劃</p>
+                    </div>
+                    <div class="card-body">
+                        <form id="recommendForm">
+                            <div class="mb-3">
+                                <label for="query" class="form-label">請描述您想去的地方或活動類型：</label>
+                                <input type="text" class="form-control form-control-lg" id="query" name="query"
+                                    placeholder="例如：想去看海、適合登山的地方、有歷史文化的景點...">
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg">獲取推薦</button>
+                            </div>
+                        </form>
+
+                        <div class="loading mt-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">正在分析您的需求並生成推薦...</p>
+                        </div>
+
+                        <div id="results" class="mt-4" style="display: none;">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h4>推薦景點</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div id="keywordsContainer" class="mb-3">
+                                        <h5>識別到的關鍵詞：</h5>
+                                        <div id="keywords" class="d-flex flex-wrap"></div>
+                                    </div>
+                                    <div id="recommendations"></div>
+                                </div>
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h4>行程規劃</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <h5>最佳路線安排</h5>
+                                        <div id="routeInfo" class="alert alert-info">
+                                            <p><strong>總行程距離：</strong><span id="totalDistance"></span></p>
+                                            <p><strong>預估總時間：</strong><span id="estimatedTime"></span></p>
+                                        </div>
+                                        <div id="route"></div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <h5>詳細行程表</h5>
+                                        <div class="timeline">
+                                            <div id="itinerary"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4>景點分布與路線視覺化</h4>
+                                </div>
+                                <div class="card-body text-center">
+                                    <img id="visualization" class="img-fluid rounded" alt="景點推薦視覺化">
+                                    <p class="text-muted mt-2">圖中數字表示推薦順序，連線表示建議的遊覽路線</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 text-end">
+                                <p class="text-muted" id="processingTime"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('recommendForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                alert('請輸入有效的查詢內容');
+                return;
+            }
+
+            // 顯示載入動畫
+            document.querySelector('.loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
+            // 發送請求
+            const formData = new FormData();
+            formData.append('query', query);
+
+            fetch('/recommend', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // 隱藏載入動畫
+                    document.querySelector('.loading').style.display = 'none';
+
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    // 顯示結果
+                    displayResults(data);
+                    document.getElementById('results').style.display = 'block';
+                })
+                .catch(error => {
+                    document.querySelector('.loading').style.display = 'none';
+                    alert('發生錯誤: ' + error);
+                });
+        });
+
+        function displayResults(data) {
+            // 顯示關鍵詞
+            const keywordsContainer = document.getElementById('keywords');
+            keywordsContainer.innerHTML = '';
+
+            if (data.keywords && data.keywords.length > 0) {
+                data.keywords.forEach(keyword => {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-info text-dark keyword-badge';
+                    badge.textContent = keyword;
+                    keywordsContainer.appendChild(badge);
+                });
+            } else {
+                keywordsContainer.innerHTML = '<p class="text-muted">未識別到特定關鍵詞</p>';
+            }
+
+            // 顯示推薦景點
+            const recommendationsContainer = document.getElementById('recommendations');
+            recommendationsContainer.innerHTML = '';
+
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach((rec, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'recommendation-item';
+
+                    const scoreClass = rec.score > 0.7 ? 'bg-success' : (rec.score > 0.4 ? 'bg-primary' : 'bg-secondary');
+
+                    item.innerHTML = `
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge ${scoreClass} badge-score">推薦指數: ${(rec.score * 100).toFixed(1)}%</span>
+                            <h5 class="mb-0">${index + 1}. ${rec.location}</h5>
+                        </div>
+                        <p>${rec.reason}</p>
+                        <div class="d-flex flex-wrap">
+                            <span class="badge bg-light text-dark me-2">評分: ${rec.avg_rating.toFixed(1)}/5</span>
+                            <span class="badge bg-light text-dark me-2">評論數: ${rec.review_count}</span>
+                            <span class="badge bg-light text-dark">關鍵詞匹配: ${rec.keyword_matches}次</span>
+                        </div>
+                    `;
+
+                    recommendationsContainer.appendChild(item);
+                });
+            } else {
+                recommendationsContainer.innerHTML = '<p class="text-muted">未找到符合條件的推薦景點</p>';
+            }
+
+            // 顯示路線
+            const routeContainer = document.getElementById('route');
+            routeContainer.innerHTML = '';
+
+            if (data.route && data.route.length > 0) {
+                const routeDiv = document.createElement('div');
+                routeDiv.className = 'd-flex flex-wrap align-items-center';
+
+                data.route.forEach((location, index) => {
+                    // 添加地點
+                    const locationDiv = document.createElement('div');
+                    locationDiv.className = 'route-step';
+                    locationDiv.innerHTML = `
+                        <div class="route-number">${index + 1}</div>
+                        <div>${location}</div>
+                    `;
+                    routeDiv.appendChild(locationDiv);
+
+                    // 添加箭頭（除了最後一個地點）
+                    if (index < data.route.length - 1) {
+                        const arrow = document.createElement('div');
+                        arrow.className = 'route-arrow';
+                        arrow.innerHTML = '→';
+                        routeDiv.appendChild(arrow);
+                    }
+                });
+
+                routeContainer.appendChild(routeDiv);
+
+                // 顯示總距離和預估時間
+                document.getElementById('totalDistance').textContent = data.total_distance.toFixed(2) + ' 單位';
+                document.getElementById('estimatedTime').textContent = data.estimated_time;
+            } else {
+                routeContainer.innerHTML = '<p class="text-muted">無法生成路線</p>';
+            }
+
+            // 顯示詳細行程表
+            const itineraryContainer = document.getElementById('itinerary');
+            itineraryContainer.innerHTML = '';
+
+            if (data.itinerary && data.itinerary.length > 0) {
+                data.itinerary.forEach(item => {
+                    const timelineItem = document.createElement('div');
+                    timelineItem.className = 'timeline-item';
+                    timelineItem.innerHTML = `
+                        <div class="timeline-content">
+                            <h5>${item.order}. ${item.location}</h5>
+                            <p><strong>抵達時間:</strong> ${item.arrival_time}</p>
+                            <p><strong>停留時間:</strong> ${item.stay_time}</p>
+                            <p><strong>離開時間:</strong> ${item.departure_time}</p>
+                        </div>
+                    `;
+                    itineraryContainer.appendChild(timelineItem);
+                });
+            } else {
+                itineraryContainer.innerHTML = '<p class="text-muted">無法生成行程表</p>';
+            }
+
+            // 顯示視覺化圖
+            document.getElementById('visualization').src = 'data:image/png;base64,' + data.visualization;
+
+            // 顯示處理時間
+            if (data.processing_time) {
+                const cacheText = data.from_cache ? ' (來自緩存)' : '';
+                document.getElementById('processingTime').textContent = `處理時間: ${data.processing_time}${cacheText}`;
+            }
+        }
+    </script>
+</body>
+
+</html>
